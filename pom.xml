@@ -758,7 +758,7 @@ limitations under the License.
         <executions>
           <execution>
             <id>validate</id>
-            <phase>validate</phase>
+            <phase>none</phase>
             <configuration>
               <configLocation>${top.dir}/src/main/config/checkstyle/checker.xml</configLocation>
               <suppressionsLocation>${top.dir}/src/main/config/checkstyle/suppressions.xml</suppressionsLocation>
