@@ -132,6 +132,7 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -170,6 +171,8 @@ public class RelMetadataTest extends SqlToRelTestBase {
    * time. */
   private static final ReentrantLock LOCK = new ReentrantLock();
 
+
+
   //~ Methods ----------------------------------------------------------------
 
   // ----------------------------------------------------------------------
@@ -188,6 +191,17 @@ public class RelMetadataTest extends SqlToRelTestBase {
     root.rel.getCluster().setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
     return root.rel;
   }
+  //----------------------------------------------------------------
+  // Tests for Privacy
+  // ----------------------------------------------------------------------
+  @Test public void testPrivacyModeDefault() {
+    RelNode rel = convertSql("SELECT * FROM dept");
+    rel.getInput(0);
+    final RelMetadataQuery mq = rel.getCluster().getMetadataQuery();
+    assertNotEquals(1,(int)mq.getPrivacy(rel.getInput(0),null));
+  }
+
+
 
   private void checkPercentageOriginalRows(String sql, double expected) {
     checkPercentageOriginalRows(sql, expected, EPSILON);

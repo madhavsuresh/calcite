@@ -105,6 +105,7 @@ public class RelMetadataQuery {
   private BuiltInMetadata.Selectivity.Handler selectivityHandler;
   private BuiltInMetadata.Size.Handler sizeHandler;
   private BuiltInMetadata.UniqueKeys.Handler uniqueKeysHandler;
+  private BuiltInMetadata.Privacy.Handler privacyHandler;
 
   public static final ThreadLocal<JaninoRelMetadataProvider> THREAD_PROVIDERS =
       ThreadLocal.withInitial(() -> JaninoRelMetadataProvider.DEFAULT);
@@ -135,6 +136,7 @@ public class RelMetadataQuery {
     this.selectivityHandler = prototype.selectivityHandler;
     this.sizeHandler = prototype.sizeHandler;
     this.uniqueKeysHandler = prototype.uniqueKeysHandler;
+    this.privacyHandler = prototype.privacyHandler;
   }
 
   protected static <H> H initialHandler(Class<H> handlerClass) {
@@ -184,6 +186,7 @@ public class RelMetadataQuery {
     this.selectivityHandler = initialHandler(BuiltInMetadata.Selectivity.Handler.class);
     this.sizeHandler = initialHandler(BuiltInMetadata.Size.Handler.class);
     this.uniqueKeysHandler = initialHandler(BuiltInMetadata.UniqueKeys.Handler.class);
+    this.privacyHandler = initialHandler(BuiltInMetadata.Privacy.Handler.class);
   }
 
   /** Re-generates the handler for a given kind of metadata, adding support for
@@ -209,6 +212,27 @@ public class RelMetadataQuery {
       }
     }
   }
+
+  /**
+   * Returns the
+   * {@link BuiltInMetadata.Privacy#getPrivacy()}
+   * statistic.
+   *
+   * @param rel the relational expression
+   * @return estimated row count, or null if no reliable estimate can be
+   * determined
+   */
+  public Integer getPrivacy(RelNode rel, RexNode predicate) {
+    for (;;) {
+      try {
+        return privacyHandler.getPrivacy(rel, this, predicate);
+      } catch (JaninoRelMetadataProvider.NoHandler e) {
+        privacyHandler = revise(e.relClass, BuiltInMetadata.Privacy.DEF);
+      }
+    }
+  }
+
+
 
   /**
    * Returns the

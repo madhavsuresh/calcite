@@ -39,6 +39,14 @@ import java.util.Set;
  */
 public abstract class BuiltInMetadata {
 
+  public interface Privacy extends Metadata {
+    MetadataDef<Privacy> DEF = MetadataDef.of(Privacy.class, Privacy.Handler.class, BuiltInMethod.PRIVACY.method);
+    Integer getPrivacy(RexNode predicate);
+    interface Handler extends MetadataHandler<Privacy> {
+      Integer getPrivacy(RelNode r, RelMetadataQuery mq, RexNode predicate);
+    }
+  }
+
   /** Metadata about the selectivity of a predicate. */
   public interface Selectivity extends Metadata {
     MetadataDef<Selectivity> DEF = MetadataDef.of(Selectivity.class,
