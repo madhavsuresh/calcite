@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.adapter.jdbc;
 
+import org.apache.calcite.adapter.opttoy.OptToyConverterRule;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.plan.Contexts;
@@ -221,6 +222,7 @@ public class JdbcRules {
       RelBuilderFactory relBuilderFactory) {
     return ImmutableList.of(
         new JdbcToEnumerableConverterRule(out, relBuilderFactory),
+        new OptToyConverterRule(out, relBuilderFactory),
         new JdbcJoinRule(out, relBuilderFactory),
         new JdbcCalcRule(out, relBuilderFactory),
         new JdbcProjectRule(out, relBuilderFactory),
