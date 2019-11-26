@@ -12,4 +12,5 @@ public interface OptToyRel extends RelNode {
     DISTRIBUTED,
     LOCAL
   }
+
 }

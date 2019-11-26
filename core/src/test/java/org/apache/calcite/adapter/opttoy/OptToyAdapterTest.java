@@ -33,6 +33,7 @@ import org.apache.calcite.config.Lex;
 import org.apache.calcite.interpreter.*;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.function.Function;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
@@ -366,6 +367,9 @@ public class OptToyAdapterTest {
     optimizer.addRule(PruneEmptyRules.PROJECT_INSTANCE);
     optimizer.addRule(new OptToyFilterRule());
     optimizer.addRule(new OptToyProjectRule());
+    optimizer.addRule(new OptToySortRule());
+    optimizer.addRule(new OptToyAggregateRule());
+    optimizer.addRule(new OptToyJoinRule());
     //optimizer.addRule(new OptToyConverterRule());
 
     // add ConverterRule
@@ -391,6 +395,7 @@ public class OptToyAdapterTest {
     // TODO(madhavsuresh): only works with needsValidation set to true.
     RelTraitSet desiredTraits =
         relNode.getCluster().traitSet().replace(OptToyConvention.INSTANCE);
+    desiredTraits.replace(EnumerableConvention.INSTANCE);
     relNode = optimizer.changeTraits(relNode, desiredTraits);
     optimizer.setRoot(relNode);
 

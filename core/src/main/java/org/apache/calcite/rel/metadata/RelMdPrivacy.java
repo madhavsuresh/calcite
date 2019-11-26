@@ -67,13 +67,13 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
 
   public Integer getPrivacy(OptToyConverterRule.JdbcToOptToyConverter rel, RelMetadataQuery mq, RexNode predicate) {
     System.out.println(rel.getInput().getRelTypeName());
-    return mq.getPrivacy(rel.getInput(0),null) +1;
+    return mq.getPrivacy(rel.getInput(0),null);
   }
 
   public Integer getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
     for (RelNode node : rel.getRels()) {
       System.out.println(node.getRelTypeName());
-      return mq.getPrivacy(node, null) +1;
+      return mq.getPrivacy(node, null);
     }
     return -1;
   }
