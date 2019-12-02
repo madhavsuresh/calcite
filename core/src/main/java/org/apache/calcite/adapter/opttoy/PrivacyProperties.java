@@ -55,8 +55,11 @@ public class PrivacyProperties {
   private HashMap<String, PrivacyMode> columnPrivacyMap;
   private HashMap<String, Partitioning> columnPartitioningMap;
 
-  public PrivacyMode getPrivacyMode(final String column) {
+  public PrivacyMode getColumnPrivacyMode(final String column) {
     return this.columnPrivacyMap.get(column);
+  }
+  public PrivacyMode getOperatorPrivacyMode() {
+    return this.operatorPrivacyMode;
   }
 
   public PrivacyProperties() {
@@ -77,7 +80,7 @@ public class PrivacyProperties {
     this.operatorPrivacyMode = privacyMode;
   }
 
-  public Partitioning getPartitioning(final String column) {
+  public Partitioning getColumnPartitioning(final String column) {
     return this.columnPartitioningMap.get(column);
   }
 

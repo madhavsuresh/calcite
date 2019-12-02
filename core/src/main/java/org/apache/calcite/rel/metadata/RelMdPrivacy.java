@@ -18,11 +18,22 @@ package org.apache.calcite.rel.metadata;
 
 import org.apache.calcite.adapter.jdbc.JdbcTableScan;
 import org.apache.calcite.adapter.opttoy.OptToyConverterRule;
+import org.apache.calcite.adapter.opttoy.OptToyFilter;
+import org.apache.calcite.adapter.opttoy.OptToyJoin;
 import org.apache.calcite.adapter.opttoy.PrivacyProperties;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexTableInputRef;
+import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.BuiltInMethod;
+import org.apache.calcite.util.Util;
 
 import javax.sql.DataSource;
 
@@ -30,6 +41,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
 
 public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
   public static final RelMetadataProvider SOURCE =
@@ -43,6 +55,7 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     return BuiltInMetadata.Privacy.DEF;
   }
 
+  // TODO(madhavsuresh): Why isn't this being cached for each call of JdbcTableScan
   public PrivacyProperties getPrivacy(JdbcTableScan rel, RelMetadataQuery mq, RexNode predicate) {
     PrivacyProperties privacyProperties = new PrivacyProperties();
     final DataSource dataSource = rel.jdbcTable.unwrap(DataSource.class);
@@ -70,6 +83,8 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     } catch (SQLException e) {
       System.out.println(e);
     }
+    privacyProperties.setOperatorPartitioning(PrivacyProperties.Partitioning.LOCAL);
+    privacyProperties.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PUBLIC);
     return privacyProperties;
   }
 
@@ -77,17 +92,45 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     return mq.getPrivacy(rel.getInput(0), null);
   }
 
-  public PrivacyProperties getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
-    for (RelNode node : rel.getRels()) {
-      return mq.getPrivacy(node, null);
+  public PrivacyProperties getPrivacy(Filter filter, RelMetadataQuery mq, RexNode predicate) {
+    System.out.println("IN HERE");
+    PrivacyProperties inputPrivacy = mq.getPrivacy(filter.getInput(),null);
+    RexNode condition = filter.getCondition();
+    if (condition.isA(SqlKind.EQUALS)) {
+      RexCall x = (RexCall) condition;
+      for ( RexNode z : x.operands) {
+        if (z.getKind() == SqlKind.LITERAL) {
+          RexLiteral l = (RexLiteral)z;
+        } else if (z.getKind() == SqlKind.INPUT_REF) {
+          RexInputRef l = (RexInputRef)z;
+          String columnName = filter.getRowType().getFieldList().get(l.getIndex()).getName();
+          //TODO(madhavsuresh): this needs to be an off switch, once any predicate is private, the whole
+          // operator should remain private.
+          inputPrivacy.setOperatorPrivacyMode(inputPrivacy.getColumnPrivacyMode(columnName));
+        }
+      }
     }
-    return null;
+    return inputPrivacy;
+  }
+
+  public PrivacyProperties getPrivacy(Join rel, RelMetadataQuery mq, RexNode predicate) {
+    return mq.getPrivacy(rel.getLeft(), null);
+    //PrivacyProperties p = new PrivacyProperties();
+    //p.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PUBLIC);
+    //return p;
+    //mq.getPrivacy(rel.getRight(), null);
+    //return null;
+  }
+  public PrivacyProperties getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
+    return mq.getPrivacy(Util.first(rel.getBest(), rel.getOriginal()),null);
   }
 
   public PrivacyProperties getPrivacy(RelNode rel, RelMetadataQuery mq, RexNode predicate) {
     if (rel.getInputs().size() > 0) {
       return mq.getPrivacy(rel.getInput(0), null);
     }
-    return null;
+    PrivacyProperties p = new PrivacyProperties();
+    p.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PRIVATE);
+    return p;
   }
 }

@@ -10,6 +10,7 @@ import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.BuiltInMetadata;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
@@ -25,9 +26,8 @@ public class OptToyJoin extends Join implements OptToyRel {
   }
 
   public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-
     mq.getPrivacy(this, null);
-    return super.computeSelfCost(planner, mq).multiplyBy(.0001);
+    return planner.getCostFactory().makeTinyCost().multiplyBy(2);
   }
 
   @Override
@@ -35,5 +35,17 @@ public class OptToyJoin extends Join implements OptToyRel {
       RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     return new OptToyJoin(getCluster(), traitSet, left, right,
         conditionExpr, variablesSet, joinType);
+  }
+
+  public PrivacyProperties.PrivacyMode getPrivacy() {
+    RelMetadataQuery mq = this.getCluster().getMetadataQuery();
+    PrivacyProperties rightProp = mq.getPrivacy(this.getRight(), null);
+    PrivacyProperties leftProp = mq.getPrivacy(this.getLeft(), null);
+    if (rightProp.getOperatorPrivacyMode() == PrivacyProperties.PrivacyMode.PUBLIC &&
+    leftProp.getOperatorPrivacyMode() == PrivacyProperties.PrivacyMode.PUBLIC) {
+      return PrivacyProperties.PrivacyMode.PUBLIC;
+    } else {
+      return PrivacyProperties.PrivacyMode.PRIVATE;
+    }
   }
 }
