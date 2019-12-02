@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.rel.metadata;
 
+import org.apache.calcite.adapter.opttoy.PrivacyProperties;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.rel.RelCollation;
@@ -41,9 +42,9 @@ public abstract class BuiltInMetadata {
 
   public interface Privacy extends Metadata {
     MetadataDef<Privacy> DEF = MetadataDef.of(Privacy.class, Privacy.Handler.class, BuiltInMethod.PRIVACY.method);
-    Integer getPrivacy(RexNode predicate);
+    PrivacyProperties getPrivacy(RexNode predicate);
     interface Handler extends MetadataHandler<Privacy> {
-      Integer getPrivacy(RelNode r, RelMetadataQuery mq, RexNode predicate);
+      PrivacyProperties getPrivacy(RelNode r, RelMetadataQuery mq, RexNode predicate);
     }
   }
 

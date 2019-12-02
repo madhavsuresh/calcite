@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.rel.metadata;
 
+import org.apache.calcite.adapter.opttoy.PrivacyProperties;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.plan.RelOptTable;
@@ -222,7 +223,7 @@ public class RelMetadataQuery {
    * @return estimated row count, or null if no reliable estimate can be
    * determined
    */
-  public Integer getPrivacy(RelNode rel, RexNode predicate) {
+  public PrivacyProperties getPrivacy(RelNode rel, RexNode predicate) {
     for (;;) {
       try {
         return privacyHandler.getPrivacy(rel, this, predicate);

@@ -27,7 +27,6 @@ public class OptToyRules {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-      System.out.println("HELL0 WORLD");
     }
   }
 }

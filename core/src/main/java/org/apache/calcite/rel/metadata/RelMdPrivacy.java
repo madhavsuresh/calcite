@@ -18,6 +18,7 @@ package org.apache.calcite.rel.metadata;
 
 import org.apache.calcite.adapter.jdbc.JdbcTableScan;
 import org.apache.calcite.adapter.opttoy.OptToyConverterRule;
+import org.apache.calcite.adapter.opttoy.PrivacyProperties;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
@@ -42,53 +43,51 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     return BuiltInMetadata.Privacy.DEF;
   }
 
-  public Integer getPrivacy(JdbcTableScan rel, RelMetadataQuery mq, RexNode predicate) {
+  public PrivacyProperties getPrivacy(JdbcTableScan rel, RelMetadataQuery mq, RexNode predicate) {
+    PrivacyProperties privacyProperties = new PrivacyProperties();
     final DataSource dataSource = rel.jdbcTable.unwrap(DataSource.class);
     String query = new StringBuilder(256).append(
         "SELECT table_name, column_name, grantee from information_schema.column_privileges WHERE table_name='")
         .append(rel.jdbcTable.jdbcTableName)
         .append("'")
         .toString();
-    System.out.println(query);
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement();
         ResultSet resultSet =
             statement.executeQuery(query);
     ) {
-      while(resultSet.next()) {
-        //System.out.println(resultSet.getString("grantee"));
+      while (resultSet.next()) {
+        final String grantee = resultSet.getString("grantee");
+        final String column_name = resultSet.getString("column_name");
+        final PrivacyProperties.PrivacyMode privacyMode = PrivacyProperties.translatePrivacyMode(grantee);
+        if (privacyMode != PrivacyProperties.PrivacyMode.NONE) {
+          privacyProperties.setColumnPrivacyMode(column_name, privacyMode);
+        } else {
+          privacyProperties.setColumnPartitioning(column_name, PrivacyProperties.translateParitioning(grantee));
+        }
       }
 
     } catch (SQLException e) {
       System.out.println(e);
     }
-    return 2;
+    return privacyProperties;
   }
 
-  public Integer getPrivacy(OptToyConverterRule.JdbcToOptToyConverter rel, RelMetadataQuery mq, RexNode predicate) {
-    System.out.println(rel.getInput().getRelTypeName());
-    return mq.getPrivacy(rel.getInput(0),null);
+  public PrivacyProperties getPrivacy(OptToyConverterRule.JdbcToOptToyConverter rel, RelMetadataQuery mq, RexNode predicate) {
+    return mq.getPrivacy(rel.getInput(0), null);
   }
 
-  public Integer getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
+  public PrivacyProperties getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
     for (RelNode node : rel.getRels()) {
-      System.out.println(node.getRelTypeName());
       return mq.getPrivacy(node, null);
     }
-    return -1;
+    return null;
   }
 
-  public Integer getPrivacy(RelNode rel, RelMetadataQuery mq, RexNode predicate) {
-    if (rel.getInputs().size()  > 0){
-      int k = mq.getPrivacy(rel.getInput(0), null);
-      System.out.println(rel.getRelTypeName());
-      System.out.println(rel.getInput(0).getRelTypeName());
-      System.out.println("RelNode WOW " + k);
-      return k+1;
-    } else {
-      System.out.println("PROJECT? " + rel.getRelTypeName());
+  public PrivacyProperties getPrivacy(RelNode rel, RelMetadataQuery mq, RexNode predicate) {
+    if (rel.getInputs().size() > 0) {
+      return mq.getPrivacy(rel.getInput(0), null);
     }
-    return 0;
-    //int k = 0;
+    return null;
   }
 }

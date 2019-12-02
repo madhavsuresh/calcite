@@ -198,7 +198,7 @@ public class RelMetadataTest extends SqlToRelTestBase {
     RelNode rel = convertSql("SELECT * FROM dept");
     rel.getInput(0);
     final RelMetadataQuery mq = rel.getCluster().getMetadataQuery();
-    assertNotEquals(1,(int)mq.getPrivacy(rel.getInput(0),null));
+    assertNotEquals(null,mq.getPrivacy(rel.getInput(0),null));
   }
 
 
