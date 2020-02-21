@@ -41,4 +41,5 @@ public class OptToyProject extends Project implements OptToyRel {
       RelTraitSet traitSet, RelNode input, List<RexNode> projects, RelDataType rowType) {
     return new OptToyProject(getCluster(), traitSet, input, projects, rowType);
   }
+
 }

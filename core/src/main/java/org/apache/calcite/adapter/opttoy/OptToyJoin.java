@@ -39,8 +39,12 @@ public class OptToyJoin extends Join implements OptToyRel {
 
   public PrivacyProperties.PrivacyMode getPrivacy() {
     RelMetadataQuery mq = this.getCluster().getMetadataQuery();
+    PrivacyProperties joinProp = mq.getPrivacy(this,null);
     PrivacyProperties rightProp = mq.getPrivacy(this.getRight(), null);
     PrivacyProperties leftProp = mq.getPrivacy(this.getLeft(), null);
+    if (rightProp == null || leftProp == null) {
+      return PrivacyProperties.PrivacyMode.NONE;
+    }
     if (rightProp.getOperatorPrivacyMode() == PrivacyProperties.PrivacyMode.PUBLIC &&
     leftProp.getOperatorPrivacyMode() == PrivacyProperties.PrivacyMode.PUBLIC) {
       return PrivacyProperties.PrivacyMode.PUBLIC;

@@ -22,82 +22,79 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.adapter.jdbc.JdbcCatalogSchema;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
-import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
-import org.apache.calcite.adapter.opttoy.OptToyConvention;
-import org.apache.calcite.adapter.opttoy.OptToyConverterRule;
-import org.apache.calcite.adapter.opttoy.OptToyRules;
 import org.apache.calcite.config.CalciteConnectionConfig;
-import org.apache.calcite.config.CalciteSystemProperty;
 import org.apache.calcite.config.Lex;
-import org.apache.calcite.interpreter.*;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.linq4j.Enumerable;
-import org.apache.calcite.linq4j.function.Function;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
-import org.apache.calcite.plan.*;
 import org.apache.calcite.plan.Context;
+import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitDef;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
-import org.apache.calcite.plan.volcano.VolcanoPlannerTraitTest;
 import org.apache.calcite.prepare.CalciteCatalogReader;
-import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
+import org.apache.calcite.rel.rules.JoinCommuteRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rel.rules.ReduceExpressionsRule;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.calcite.schema.impl.ViewTableMacro;
-import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlDialectFactoryImpl;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-import org.apache.calcite.sql.validate.*;
+import org.apache.calcite.sql.validate.SqlConformance;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
+import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.test.CalciteAssert;
-import org.apache.calcite.tools.*;
-import org.apache.calcite.util.Bug;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.Programs;
+import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.BuiltInMethod;
-import org.apache.calcite.util.Sources;
-import org.apache.calcite.util.TestUtil;
-
-import com.google.common.collect.ImmutableMap;
-
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.lang.Validate;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.rules.ExternalResource;
-import org.junit.runner.Description;
-import org.junit.runners.model.Statement;
 
-import javax.sql.DataSource;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
 
 import static org.apache.calcite.test.Matchers.hasTree;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assume.assumeTrue;
 
 /**
  * Tests for the {@code org.apache.calcite.adapter.cassandra} package.
@@ -123,7 +120,7 @@ public class OptToyAdapterTest {
   @BeforeClass
   public static void setUp() throws ClassNotFoundException, SQLException {
     // run tests only if explicitly enabled
-    String url = "jdbc:postgresql://localhost:5432/tpch_unioned";
+    String url = "jdbc:postgresql://localhost:5432/simple_join256";
     Properties props = new Properties();
     props.setProperty("caseSensitive", "false");
     Connection connection = DriverManager.getConnection("jdbc:calcite:", props);
@@ -152,7 +149,7 @@ public class OptToyAdapterTest {
     final Expression expression =
         calciteConnection.getRootSchema() != null
             ? Schemas.subSchemaExpression(
-                calciteConnection.getRootSchema(), "name", JdbcCatalogSchema.class)
+            calciteConnection.getRootSchema(), "name", JdbcCatalogSchema.class)
             : Expressions.call(DataContext.ROOT, BuiltInMethod.DATA_CONTEXT_GET_ROOT_SCHEMA.method);
     final SqlDialect dialect = JdbcSchema.createDialect(SqlDialectFactoryImpl.INSTANCE, dataSource);
     convention = JdbcConvention.of(dialect, expression, "name");
@@ -208,6 +205,7 @@ public class OptToyAdapterTest {
         .traitDefs((List<RelTraitDef>) null)
         .programs(Programs.heuristicJoinOrder(Programs.RULE_SET, true, 2));
   }
+
   /**
    * Creates a config builder that will contain a view, "MYVIEW", and also the SCOTT JDBC schema,
    * whose tables implement {@link org.apache.calcite.schema.TranslatableTable}.
@@ -244,6 +242,14 @@ public class OptToyAdapterTest {
     final RelDataTypeFactory typeFactory =
         new SqlTypeFactoryImpl(org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT);
     return RelOptCluster.create(planner, new RexBuilder(typeFactory));
+  }
+
+  @Test
+  public void testSimpleJoin256() throws ValidationException, SqlParseException {
+    String sql =
+        "SELECT a_1 from simple_join256_1,  simple_join256_2, simple_join256_3\n"
+            + "WHERE a_1=a_3 AND a_1=a_2";
+    testTPCHQuery(sql);
   }
 
   @Test
@@ -325,6 +331,13 @@ public class OptToyAdapterTest {
   }
 
   @Test
+  public void testPublicQuery() throws ValidationException, SqlParseException {
+    String sql =
+        "select ps_suppkey from partsupp, supplier WHERE ps_suppkey = s_suppkey";
+    testTPCHQuery(sql);
+  }
+
+  @Test
   public void testTPCHQuery3() throws ValidationException, SqlParseException {
     String sql =
         "select\n"
@@ -342,8 +355,8 @@ public class OptToyAdapterTest {
             + "  c.c_mktsegment = 'HOUSEHOLD'\n"
             + "  and c.c_custkey = o.o_custkey\n"
             + "  and l.l_orderkey = o.o_orderkey\n"
-            + "--  and o.o_orderdate < date '1995-03-25'\n"
-            + "--  and l.l_shipdate > date '1995-03-25'\n"
+            + "  and o.o_orderdate < date '1995-03-25'\n"
+            + "  and l.l_shipdate > date '1995-03-25'\n"
             + "\n"
             + "group by\n"
             + "  l.l_orderkey,\n"
@@ -370,6 +383,9 @@ public class OptToyAdapterTest {
     optimizer.addRule(new OptToySortRule());
     optimizer.addRule(new OptToyAggregateRule());
     optimizer.addRule(new OptToyJoinRule());
+    optimizer.addRule(new OptToyPublicJoinRule());
+    //optimizer.addRule(JoinAddRedundantSemiJoinRule.INSTANCE);
+    optimizer.addRule(JoinCommuteRule.INSTANCE);
     //optimizer.addRule(new OptToyConverterRule());
 
     // add ConverterRule
@@ -377,7 +393,6 @@ public class OptToyAdapterTest {
     for (RelOptRule rule : EnumerableRules.rules()) {
       optimizer.addRule(rule);
     }
-    /*
     optimizer.addRule(EnumerableRules.ENUMERABLE_BATCH_NESTED_LOOP_JOIN_RULE);
     optimizer.addRule(EnumerableRules.ENUMERABLE_JOIN_RULE);
     optimizer.addRule(EnumerableRules.ENUMERABLE_MERGE_JOIN_RULE);
@@ -385,21 +400,28 @@ public class OptToyAdapterTest {
     optimizer.addRule(EnumerableRules.ENUMERABLE_VALUES_RULE);
     optimizer.addRule(EnumerableRules.ENUMERABLE_PROJECT_RULE);
     optimizer.addRule(EnumerableRules.ENUMERABLE_FILTER_RULE);
-       */
     SqlNode node = planner.parse(sql);
     node = planner.validate(node);
     SqlToRelConverter converter = createSqlToRelConverter();
     RelRoot n = converter.convertQuery(node, true, true);
-    RelNode relNode = n.rel;
-
+    RelNode relNode = converter.trimUnusedFields(!n.collation.getFieldCollations().isEmpty(), n.rel);
+    //RelNode relNode = n.rel;
+    relNode.getCluster().setMetadataProvider(new CachingRelMetadataProvider(
+        relNode.getCluster().getMetadataProvider(),
+        relNode.getCluster().getPlanner()));
     // TODO(madhavsuresh): only works with needsValidation set to true.
     RelTraitSet desiredTraits =
         relNode.getCluster().traitSet().replace(OptToyConvention.INSTANCE);
-    desiredTraits.replace(EnumerableConvention.INSTANCE);
+    //desiredTraits =
+    //relNode.getCluster().traitSet().replace(OptToyConvention.INSTANCE).;
+    //desiredTraits.replace(OptToyConvention.INSTANCE);
     relNode = optimizer.changeTraits(relNode, desiredTraits);
     optimizer.setRoot(relNode);
 
     RelNode n2 = optimizer.findBestExp();
+    System.out.println(n2.getExpectedInputRowType(0));
+    System.out.println(optimizer.getCost(n2, relNode.getCluster().getMetadataQuery()));
+    System.out.println(n2.getInput(0).getRowType());
     System.out.println(RelOptUtil.toString(n2));
   }
 
@@ -422,8 +444,8 @@ public class OptToyAdapterTest {
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(cluster, null);
     RelNode logicalPlan =
         relBuilder
-            .values(new String[] {"id", "name"}, "2", "a", "1", "b")
-            .values(new String[] {"id", "name"}, "1", "x", "2", "y")
+            .values(new String[]{"id", "name"}, "2", "a", "1", "b")
+            .values(new String[]{"id", "name"}, "1", "x", "2", "y")
             .join(JoinRelType.INNER, "id")
             .build();
 
@@ -464,12 +486,12 @@ public class OptToyAdapterTest {
     RelOptCluster cluster = newCluster(planner);
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(cluster, null);
     RelNode logicalPlan = relBuilder
-            .values(new String[]{"id", "name"}, "2", "a", "1", "b")
-            .values(new String[]{"id", "name"}, "1", "x", "2", "y")
-            .join(JoinRelType.INNER, "id")
-            .build();
+        .values(new String[]{"id", "name"}, "2", "a", "1", "b")
+        .values(new String[]{"id", "name"}, "1", "x", "2", "y")
+        .join(JoinRelType.INNER, "id")
+        .build();
     RelTraitSet desiredTraits =
-            cluster.traitSet().replace(OptToyConvention.INSTANCE);
+        cluster.traitSet().replace(OptToyConvention.INSTANCE);
     final RelNode newRoot = planner.changeTraits(logicalPlan, desiredTraits);
     planner.setRoot(newRoot);
     RelNode bestExp = planner.findBestExp();

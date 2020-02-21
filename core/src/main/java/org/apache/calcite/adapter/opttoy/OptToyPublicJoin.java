@@ -25,7 +25,7 @@ public class OptToyPublicJoin extends OptToyJoin implements OptToyRel {
 
   public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
 
-    return planner.getCostFactory().makeTinyCost();
+    return super.computeSelfCost(planner,mq);
   }
 
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr,

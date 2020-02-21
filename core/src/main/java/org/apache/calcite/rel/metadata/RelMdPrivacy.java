@@ -18,8 +18,6 @@ package org.apache.calcite.rel.metadata;
 
 import org.apache.calcite.adapter.jdbc.JdbcTableScan;
 import org.apache.calcite.adapter.opttoy.OptToyConverterRule;
-import org.apache.calcite.adapter.opttoy.OptToyFilter;
-import org.apache.calcite.adapter.opttoy.OptToyJoin;
 import org.apache.calcite.adapter.opttoy.PrivacyProperties;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
@@ -29,8 +27,6 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexTableInputRef;
-import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.calcite.util.Util;
@@ -41,7 +37,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Set;
 
 public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
   public static final RelMetadataProvider SOURCE =
@@ -88,22 +83,24 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     return privacyProperties;
   }
 
-  public PrivacyProperties getPrivacy(OptToyConverterRule.JdbcToOptToyConverter rel, RelMetadataQuery mq, RexNode predicate) {
+  public PrivacyProperties getPrivacy(OptToyConverterRule.JdbcToOptToyConverter rel, RelMetadataQuery mq,
+      RexNode predicate) {
     return mq.getPrivacy(rel.getInput(0), null);
   }
 
   public PrivacyProperties getPrivacy(Filter filter, RelMetadataQuery mq, RexNode predicate) {
-    System.out.println("IN HERE");
-    PrivacyProperties inputPrivacy = mq.getPrivacy(filter.getInput(),null);
+    PrivacyProperties inputPrivacy = mq.getPrivacy(filter.getInput(), null);
     RexNode condition = filter.getCondition();
     if (condition.isA(SqlKind.EQUALS)) {
       RexCall x = (RexCall) condition;
-      for ( RexNode z : x.operands) {
+      for (RexNode z : x.operands) {
         if (z.getKind() == SqlKind.LITERAL) {
-          RexLiteral l = (RexLiteral)z;
+          RexLiteral l = (RexLiteral) z;
         } else if (z.getKind() == SqlKind.INPUT_REF) {
-          RexInputRef l = (RexInputRef)z;
+          RexInputRef l = (RexInputRef) z;
           String columnName = filter.getRowType().getFieldList().get(l.getIndex()).getName();
+          System.out.print(columnName);
+          System.out.println(filter);
           //TODO(madhavsuresh): this needs to be an off switch, once any predicate is private, the whole
           // operator should remain private.
           inputPrivacy.setOperatorPrivacyMode(inputPrivacy.getColumnPrivacyMode(columnName));
@@ -113,24 +110,28 @@ public class RelMdPrivacy implements MetadataHandler<BuiltInMetadata.Privacy> {
     return inputPrivacy;
   }
 
+  //TODO(madhavsuresh): for now only support equi-joins.
   public PrivacyProperties getPrivacy(Join rel, RelMetadataQuery mq, RexNode predicate) {
-    return mq.getPrivacy(rel.getLeft(), null);
-    //PrivacyProperties p = new PrivacyProperties();
-    //p.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PUBLIC);
-    //return p;
-    //mq.getPrivacy(rel.getRight(), null);
-    //return null;
+    //TODO(madhavsuresh): Only supporting equijoins
+    PrivacyProperties join = new PrivacyProperties(mq.getPrivacy(rel.getLeft(), null),
+        mq.getPrivacy(rel.getRight(), null), rel);
+    return join;
   }
+
   public PrivacyProperties getPrivacy(RelSubset rel, RelMetadataQuery mq, RexNode predicate) {
-    return mq.getPrivacy(Util.first(rel.getBest(), rel.getOriginal()),null);
+    return mq.getPrivacy(Util.first(rel.getBest(), rel.getOriginal()), null);
   }
 
   public PrivacyProperties getPrivacy(RelNode rel, RelMetadataQuery mq, RexNode predicate) {
-    if (rel.getInputs().size() > 0) {
+    if (rel.getInputs().size() == 1) {
       return mq.getPrivacy(rel.getInput(0), null);
     }
-    PrivacyProperties p = new PrivacyProperties();
-    p.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PRIVATE);
-    return p;
+    /* TODO(madhavsuresh): because this code is generated, it's complicated to throw an exception. this should never
+       happen anyway. The only operator we considering with multiple inputs is a join.
+    */
+    return null;
+    //PrivacyProperties p = new PrivacyProperties();
+    //p.setOperatorPrivacyMode(PrivacyProperties.PrivacyMode.PRIVATE);
+    //return p;
   }
 }

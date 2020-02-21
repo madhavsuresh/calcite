@@ -25,4 +25,5 @@ public class OptToyFilter extends Filter implements OptToyRel {
   public Filter copy(RelTraitSet traitSet, RelNode input, RexNode condition) {
     return new OptToyFilter(getCluster(), traitSet, input, condition);
   }
+
 }
